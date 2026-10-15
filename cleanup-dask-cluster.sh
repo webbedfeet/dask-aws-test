@@ -62,6 +62,11 @@ if [ -z "${INSTANCE_IDS// /}" ] && [ -z "${SG_IDS// /}" ] && [ -z "${KEY_NAMES//
     exit 0
 fi
 
+echo "This is PERMANENT. The instances are terminated and $CONFIG_FILE and the .pem key are"
+echo "deleted, so ./setup-dask-cluster.sh --restart will no longer work afterwards."
+echo "If you only want to continue in a later lab session, do NOT clean up: the lab"
+echo "stops the instances for you, and --restart brings them back."
+echo ""
 read -r -p "Are you sure you want to delete all these resources? (yes/no): " CONFIRM
 if [ "$CONFIRM" != "yes" ]; then
     log_info "Cleanup cancelled"

@@ -13,10 +13,13 @@ source dask-cluster-config.txt                        # KEY_FILE, SCHEDULER_PUBL
 ./setup-dask-cluster.sh 3             # create: 1 scheduler + 3 workers (max 8 workers)
 ./setup-dask-cluster.sh --restart     # after a Learner Lab restart (new IPs)
 ./validate-dask-cluster.sh            # health check
-./cleanup-dask-cluster.sh             # terminate everything
+./cleanup-dask-cluster.sh             # PERMANENT: terminate everything (no --restart afterwards)
+                                      # not needed between sessions; the lab stops instances itself
 ```
 
-## Local
+## Workstation (single node)
+
+All commands below run on your EC2 workstation unless marked *laptop*.
 
 ```bash
 cd cluster-files && uv sync
@@ -38,8 +41,12 @@ export TAXI_S3_PATH=s3://YOUR-BUCKET/YOUR-PREFIX
 export SCHEDULER_PRIVATE_IP=10.0.x.x
 ~/dask-env/bin/python nyc_tlc_problem1_cluster.py      # -> daily_averages_cluster.csv
 
-# dashboard (from your laptop), then open http://localhost:8787
-ssh -i $KEY_FILE -L 8787:localhost:8787 ubuntu@$SCHEDULER_PUBLIC_IP
+# dashboard (*laptop*): two hops, then open http://localhost:8787
+ssh -i WORKSTATION-KEY.pem -L 8787:localhost:8787 ubuntu@WORKSTATION_PUBLIC_IP \
+  -t "source ~/dask-aws-test/dask-cluster-config.txt && \
+      ssh -i ~/dask-aws-test/\$KEY_FILE -L 8787:localhost:8787 ubuntu@\$SCHEDULER_PUBLIC_IP"
+# local run's dashboard (*laptop*): one hop
+ssh -i WORKSTATION-KEY.pem -L 8787:localhost:8787 ubuntu@WORKSTATION_PUBLIC_IP
 
 # fetch results
 scp -i $KEY_FILE ubuntu@$SCHEDULER_PUBLIC_IP:~/dask-lab/daily_averages_cluster.csv .

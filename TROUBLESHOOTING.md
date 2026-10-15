@@ -9,7 +9,7 @@ prefix, or a `yyyy=2023/` folder in the path. If your files live somewhere diffe
 `TAXI_S3_PATH` at the folder that *directly contains* the twelve files.
 
 **`PermissionError` / `AccessDenied` / `NoCredentialsError`**
-- Laptop: Learner Lab credentials expire when the lab session ends. Start the lab, copy the new
+- Workstation: Learner Lab credentials expire when the lab session ends. Start the lab, copy the new
   credentials into `~/.aws/credentials`, and check with `aws sts get-caller-identity`.
 - Cluster: the nodes need `LabInstanceProfile`. The setup script attaches it; if you built nodes by
   hand, attach it in the EC2 console (Actions > Security > Modify IAM role).
@@ -24,7 +24,7 @@ Run `test_nyc_data_read.py` and compare the schema it prints to the six columns 
 A previous cluster is still registered. Use `./cleanup-dask-cluster.sh` first, or `--restart` to reuse it.
 
 **Can't connect to the scheduler** (`OSError: Timed out trying to connect`)
-- Run the client on the scheduler node, not your laptop.
+- Run the client on the scheduler node, not on the workstation or your laptop.
 - Use the **private** IP: `tcp://<SCHEDULER_PRIVATE_IP>:8786`.
 - Run `./validate-dask-cluster.sh`. If the scheduler is down: `./setup-dask-cluster.sh --restart`.
 
@@ -38,7 +38,7 @@ Your client must use the same Dask and Python as the cluster. On the scheduler n
 The Learner Lab stops instances when a session ends. Start the lab, refresh credentials, then `./setup-dask-cluster.sh --restart`. If your own IP changed, the script re-opens SSH for it.
 
 **SSH: `Connection timed out`**
-Your laptop IP changed (new network, VPN). Run `./setup-dask-cluster.sh --restart --laptop-ip $(curl -s https://checkip.amazonaws.com)`.
+The workstation's public IP changed (it was stopped and restarted). On the workstation run `./setup-dask-cluster.sh --restart`, which re-opens SSH for its new IP. If your *laptop* can't SSH into the workstation, that is a separate problem: check the workstation's own security group and its current public IP in the EC2 console.
 
 **`Permission denied (publickey)`**
 Wrong key or permissions: `chmod 400 *.pem` and use the key file named in `dask-cluster-config.txt`.
@@ -46,11 +46,11 @@ Wrong key or permissions: `chmod 400 *.pem` and use the key file named in `dask-
 ## Dashboard
 
 **http://localhost:8787 doesn't load**
-The tunnel terminal must stay open. If port 8787 is busy locally, tunnel to another port: `-L 9787:localhost:8787` and browse to `localhost:9787`.
+The tunnel terminal must stay open. For the cluster dashboard you need both hops (see the README); if the second hop fails with `Connection timed out`, the workstation's public IP changed since setup. Run `./setup-dask-cluster.sh --restart` on the workstation, which re-opens SSH for its new IP. If the first hop fails, the workstation's public IP changed after a restart: look up the new one in the EC2 console. If port 8787 is busy locally, tunnel to another port: `-L 9787:localhost:8787` and browse to `localhost:9787`.
 
 ## Performance
 
-**Slow locally, but not on the cluster (or vice versa)?** That is the point of the lab. Local reads pull data over your internet connection, while cluster nodes read S3 over AWS's network.
+**Slow on the workstation, but not on the cluster (or vice versa)?** That is the point of the lab. One instance has a fixed number of cores and memory; the cluster adds more.
 
 **Job runs out of memory**
 Close other applications. Locally, edit `memory_limit` in `create_dask_client()`. Only read the columns you need (the scripts already pass `columns=[...]`).

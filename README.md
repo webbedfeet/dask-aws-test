@@ -95,7 +95,7 @@ From the repo root:
 ./validate-dask-cluster.sh
 ```
 
-Setup takes about 5-8 minutes. It saves everything it created in `dask-cluster-config.txt` and a `.pem` key file, **on the workstation**. Don't delete these until you have run the cleanup script. The script opens SSH to the cluster only from the workstation's IP, which is what you want: you reach the cluster *through* the workstation.
+More workers means a faster run (3-4 is a good size for this lab). Setup takes about 5-8 minutes. It saves everything it created in `dask-cluster-config.txt` and a `.pem` key file, **on the workstation**. Don't delete these until you have run the cleanup script. The script opens SSH to the cluster only from the workstation's IP, which is what you want: you reach the cluster *through* the workstation.
 
 (The script's `--laptop-ip` option is for the machine you run it from, which here is the workstation. You normally don't need it.)
 
@@ -192,8 +192,8 @@ Always run cleanup when you are completely done: running instances use your cred
 
 1. How long did Problem 1 take on the single workstation vs. on the cluster? Which was faster, and why might it not be what you expected?
 2. Open the dashboard's Task Stream. How many partitions does the data have? How many tasks run in parallel?
-3. Why does `nyc_tlc_year.persist()` help here? What would happen without it?
-4. Our 95th-percentile calculation is exact. What is the trade-off versus Spark's `percentile_approx`?
+3. An earlier version of this lab computed the 95th percentile with `groupby(...).apply(quantile)`, and workers died with "exceeded 95% memory budget". Why does that need far more memory than a mean or a max? How does counting trips at each fare (in cents) avoid the problem?
+4. Our 95th-percentile calculation is exact for fares that are whole cents (it rounds to the nearest cent). What is the trade-off versus Spark's `percentile_approx`, and what would change if fares had sub-cent values?
 5. What happens to the job if you remove a worker mid-run (stop one worker instance)?
 
 ## Submission

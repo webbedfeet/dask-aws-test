@@ -75,6 +75,19 @@ def get_s3_paths(s3_path, months_to_read):
     return paths
 
 
+def percentile_from_counts(counts, q=0.95):
+    """Exact percentile (pandas' linear interpolation) from a table of
+    (fare_cents, n) pairs: n trips had a fare of fare_cents for one day."""
+    counts = counts.sort_values("fare_cents")
+    cumulative = counts["n"].to_numpy().cumsum()
+    values = counts["fare_cents"].to_numpy()
+    position = q * (cumulative[-1] - 1)
+    low, high = int(np.floor(position)), int(np.ceil(position))
+    value_low = values[np.searchsorted(cumulative, low, side="right")]
+    value_high = values[np.searchsorted(cumulative, high, side="right")]
+    return (value_low + (value_high - value_low) * (position - low)) / 100
+
+
 def solve_problem1(data_files, output_file):
     """
     Solve Problem 1: Calculate daily summaries of key metrics.
@@ -105,7 +118,9 @@ def solve_problem1(data_files, output_file):
     ]
     logger.info(f"Reading {len(data_files)} parquet files into single DataFrame")
     print("Reading all data files into a single DataFrame...")
-    nyc_tlc = dd.read_parquet(data_files, columns=columns)
+    # split_row_groups=True: one partition per Parquet row group instead of one
+    # per file, so each task holds a fraction of a month rather than all of it
+    nyc_tlc = dd.read_parquet(data_files, columns=columns, split_row_groups=True)
 
     # Step 1: Derive date columns
     logger.info("Step 1: Deriving date columns from tpep_pickup_datetime")
@@ -122,12 +137,9 @@ def solve_problem1(data_files, output_file):
     print(f"Step 2: Filtering data for year {YEAR}...")
     nyc_tlc_year = nyc_tlc[nyc_tlc["dt_year"] == YEAR]
 
-    # Keep the filtered data in (distributed) memory so the two aggregations
-    # below do not each re-read the files from S3
-    nyc_tlc_year = nyc_tlc_year.persist()
-    filtered_rows = len(nyc_tlc_year)
-    logger.info(f"Filtered dataset to {filtered_rows:,} rows for year {YEAR}")
-    print(f"✅ Filtered to {filtered_rows:,} rows for year {YEAR}")
+    # Note: we deliberately do NOT .persist() the filtered data. A full year is
+    # ~38 million rows; holding it in worker memory risks pushing small workers
+    # past 95% of their memory limit, and Dask then kills them.
 
     # Step 3: Calculate daily summaries
     logger.info("Step 3: Calculating daily summaries with aggregations")
@@ -142,16 +154,29 @@ def solve_problem1(data_files, output_file):
         mean_passenger_count=("passenger_count", "mean"),
     ).compute()
 
-    # Dask has no approximate groupby quantile, so compute the exact 95th
-    # percentile per day (Spark's percentile_approx is only approximate)
-    q95 = (
-        grouped["fare_amount"]
-        .apply(lambda s: s.quantile(0.95), meta=("q95_fare_amount", "f8"))
+    # Dask has no groupby quantile. groupby().apply(quantile) works but shuffles
+    # every row between workers, which ran our workers out of memory. Instead,
+    # use that fares are whole cents: count the trips at each fare per day (a
+    # small table), then read the exact 95th percentile off the cumulative counts.
+    fares = nyc_tlc_year[nyc_tlc_year["fare_amount"].notnull()]
+    fare_counts = (
+        fares.assign(fare_cents=(fares["fare_amount"] * 100).round().astype("int64"))
+        .groupby(GROUP_KEYS + ["fare_cents"])
+        .size()
         .compute()
+        .rename("n")
+        .reset_index()
+    )
+    q95 = (
+        fare_counts.groupby(GROUP_KEYS)
+        .apply(percentile_from_counts, include_groups=False)
         .rename("q95_fare_amount")
     )
 
     daily = daily.join(q95).reset_index()
+    filtered_rows = int(daily["num_trips"].sum())
+    logger.info(f"Filtered dataset to {filtered_rows:,} rows for year {YEAR}")
+    print(f"✅ Filtered to {filtered_rows:,} rows for year {YEAR}")
     daily["mean_passenger_count"] = np.ceil(daily["mean_passenger_count"])
 
     # Step 4: Sort by date in descending order

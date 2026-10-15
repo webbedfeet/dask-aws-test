@@ -7,7 +7,7 @@ dependencies = [
     # Keep the Dask version in sync with DASK_VERSION in ../setup-dask-cluster.sh
     "dask[complete]==2026.8.0",
     "s3fs>=2024.2.0",
-    "pandas>=2.0.0",
+    "pandas>=2.2.0",
     "numpy>=1.24.0",
     "pyarrow>=21.0.0",
     "matplotlib>=3.7.0",

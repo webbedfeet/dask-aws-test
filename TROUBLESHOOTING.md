@@ -31,6 +31,9 @@ A previous cluster is still registered. Use `./cleanup-dask-cluster.sh` first, o
 **Worker/scheduler version-mismatch warnings**
 Your client must use the same Dask and Python as the cluster. On the scheduler node use `~/dask-env/bin/python`, not the system `python3`.
 
+**`Worker exceeded 95% memory budget` / `all those workers died while running it`**
+The job needs more memory than the workers have; Dask restarts the worker, and the retried task kills it again. Common causes: `.persist()` on large data, `groupby(...).apply(...)` (it shuffles every row between workers), and partitions that are too big (read Parquet with `split_row_groups=True`). Fixes: avoid those, read only the columns you need, and add workers (`./setup-dask-cluster.sh 4`). Check which with `dmesg | grep -i killed` and `tail ~/dask-worker.log` on a worker.
+
 **Fewer workers than expected**
 `tail ~/dask-worker.log` on that worker. Memory-limit kills show up as `Worker exceeded 95% memory`. Fix by using more workers, or fewer partitions per worker, not by editing code.
 

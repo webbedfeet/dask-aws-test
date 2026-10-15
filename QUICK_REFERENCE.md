@@ -80,7 +80,7 @@ client.dashboard_link
 import dask.dataframe as dd
 df = dd.read_parquet(["s3://.../yellow_tripdata_2023-01.parquet", ...], columns=[...])
 df.npartitions
-df = df.persist()                           # keep in cluster memory
+df = df.persist()                           # keep in cluster memory (only if it fits! see Troubleshooting)
 result = df.groupby("k").agg(n=("x", "size")).compute()   # -> pandas
 ```
 

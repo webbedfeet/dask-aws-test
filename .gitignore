@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pem
+dask-cluster-config.txt
+bootstrap-*.log
+daily_averages*.csv
+.ipynb_checkpoints/
